@@ -19,11 +19,9 @@
 #ifndef SLAVE_H
 #define SLAVE_H
 
-# define CTRL_PROMPT		"\033\034BBash $> \033\034\012"
-# define CTRL_PROMPT_SIZE	15
-
 # include <sys/socket.h>
 # include <arpa/inet.h>
+# include <netdb.h>
 
 # include <sys/mman.h>
 //# include <termios.h>
@@ -38,10 +36,20 @@
 # include <sys/wait.h>
 # include <stdarg.h>
 
+typedef struct auth
+{
+	int	pr;
+	int	gr;
+	int	ioctl;
+	int	setsid;
+}	s_auth;
+
 typedef struct blue
 {
 	int		master;		// ptm fd
 	int		slave;		// pts fd
+	int		client;		// client fd (i/o)
+	s_auth	auth;		// authorizations
 	s_ratz	ratz;		// other things
 }	s_blue;
 

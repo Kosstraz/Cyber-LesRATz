@@ -51,7 +51,7 @@ OBJS = $(SRCS:%.c=$(OBJS_DIR)/%.obj)
 
 DEPS = $(OBJS:%.obj=%.d)
 
-CFLAGS = -Wall -Wextra -Wno-unused-result -Wno-format -MMD -g3 -lc
+CFLAGS = -Wall -Wextra -Wno-unused-result -Wno-format -MMD -g3
 
 LIB = -lreadline -lc
 
