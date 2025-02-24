@@ -113,7 +113,7 @@ int	main(int, char** av)
 			cmd[n] = '\0';
 			write(blue.master, cmd, n);
 			write(blue.master, "\n", 1);
-			sleep(1);
+			sleep(1); // Better soon. How to know if a command-line has finished his execution ??
 			n = read(blue.master, cmd, DEBUG_SIZE_MAX);
 			cmd[n] = '\0';
 			write(blue.ratz.server, cmd, n);
