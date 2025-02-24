@@ -16,33 +16,33 @@
 /*               `----'              `---'      `--`---'                               */
 /***************************************************************************************/
 
-#ifndef RAPIDO_H
-#define RAPIDO_H
+#ifndef MASTER_H
+#define MASTER_H
 
-# define LOCALHOST		"127.0.0.1"
-# define PORT_DEFAULT	8085
-# define PROMPT			"\e[1;32mLesRatz =>\e[0m "
-# define REMOTE_PROMPT	"\032\031\030\e[0mBASHTERM\e[0m\030\031\032"
+# define PROMPT	"\e[1;32mRATBoard =>\e[0m "
 
-// utils
+# include <sys/socket.h>
+# include <arpa/inet.h>
+
+# include <sys/mman.h>
+# include <sys/stat.h>
+
+# include <signal.h>
+# include <fcntl.h>
 # include <string.h>
 # include <unistd.h>
 # include <stdio.h>
 # include <stdlib.h>
-# include <sys/time.h>
 
-// network
-# include <sys/socket.h>
-# include <netinet/in.h>
-# include <fcntl.h>
-# include <stdarg.h>
+# include <readline/readline.h>
+# include <readline/history.h>
 
-typedef struct network
+typedef struct red
 {
-	char	prompt[128];
-	int		rapido;
-	int		razmo_in;
-	int		razmo_out;
-}	s_network;
+	int		killed;
+	char*	buffer;		// prompt line
+	int		client;		// client fd (i/o)
+	s_ratz	ratz;		// other things
+}	s_red;
 
 #endif

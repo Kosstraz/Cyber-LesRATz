@@ -16,38 +16,38 @@
 /*               `----'              `---'      `--`---'                               */
 /***************************************************************************************/
 
-#ifndef RAZMO_H
-#define RAZMO_H
+#ifndef RATZ_H
+#define RATZ_H
 
-# define LOCALHOST		"127.0.0.1"
-# define PORT_DEFAULT	8085
-# define REMOTE_PROMPT	"\032\031\030\e[0mBASHTERM\e[0m\030\031\032"
+# define LOCALHOST	"127.0.0.1"
+# define PORT		8085
 
-// master/slave pty
-# define _XOPEN_SOURCE 600
-# include <unistd.h>
-# include <fcntl.h>
-# include <stdlib.h>
-# include <signal.h>
-# include <sys/wait.h>
+# define _DEFAULT_SOURCE
+# define DEBUG_SIZE_MAX	1024
 
-// utils
-# include <stdarg.h>
-# include <string.h>
-# include <stdio.h>
+# define _XOPEN_SOURCE	9999
 
-// network
-# include <sys/socket.h>
 # include <netinet/in.h>
 # include <arpa/inet.h>
-# include <poll.h>
+
+# include <unistd.h>
+# include <stdlib.h>
+# include <errno.h>
+# include <string.h>
+
+typedef struct sockaddr_in	s_sockaddr_in;
+typedef struct sockaddr		s_sockaddr;
 
 typedef struct ratz
 {
-	int		master;
-	int		slave;
-	int		whip_in;
-	int		whip_out;
+	int				raw_port;	// raw port (int BigEndian)
+	int				server;		// server fd
+	s_sockaddr_in	addri;		// socket address info
+	socklen_t		addri_len;	// socket address' len
 }	s_ratz;
+
+void	strexit(const char* msg, int errcode);
+void	ratz_set_addri(s_sockaddr_in* addri, sa_family_t af, char* ip, in_port_t raw_port);
+int		ratz__get_port_method(char* port);
 
 #endif
