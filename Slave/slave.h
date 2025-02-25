@@ -49,6 +49,7 @@ typedef struct blue
 	int		master;		// ptm fd
 	int		slave;		// pts fd
 	int		client;		// client fd (i/o)
+	int		chd;		// child
 	s_auth	auth;		// authorizations
 	s_ratz	ratz;		// other things
 }	s_blue;
