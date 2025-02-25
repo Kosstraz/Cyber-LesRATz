@@ -159,15 +159,20 @@ void	send_auth_error(s_blue blue)
 		auth_msg[n + 2] = 'l';
 		n += 3;
 	}
-	printf("n : %d\n", n);
 	write(blue.client, auth_msg, 11);
 	write(blue.client, "\1", 2);
+}
+
+void	wait_new_connection(s_blue* blue)
+{
+	
 }
 
 int	main(int unused, char** av)
 {
 	(void)unused;
 
+	int		fdsave[2];
 	int		chd;
 	s_blue	blue;
 	memset(&blue, 0, sizeof(blue));
@@ -200,13 +205,33 @@ int	main(int unused, char** av)
 		close(blue.slave);
 		char	cmd[DEBUG_SIZE_MAX] = {0};
 		int		n = 0;
-		fcntl(blue.client, F_SETFL, ~O_NONBLOCK);
+		int		m = 0;
+		fcntl(blue.client, F_SETFL, O_NONBLOCK);
 		fcntl(blue.master, F_SETFL, O_NONBLOCK);
+		fdsave[0] = blue.client;
+		fdsave[1] = blue.master;
+		ratz_reset_fdset(&blue.ratz.poll.rdset, 2, fdsave);
+		ratz_reset_fdset(&blue.ratz.poll.wrset, 2, fdsave);
+		ratz_select(&blue.ratz.poll);
+		
 		send_auth_error(blue);
 		while (waitpid(chd, NULL, WNOHANG) == 0)
 		{
+			ratz_reset_fdset(&blue.ratz.poll.rdset, 2, fdsave);
+			ratz_reset_fdset(&blue.ratz.poll.wrset, 2, fdsave);
+			ratz_select(&blue.ratz.poll);
 			memset(cmd, 0, DEBUG_SIZE_MAX);
-			read(blue.client, cmd, DEBUG_SIZE_MAX);
+			while (1)
+			{
+				n = read(blue.client, cmd, DEBUG_SIZE_MAX);
+				if (fcntl(blue.client, F_GETFD) == -1)
+				{
+					printf("DECONNECTION!!!\n");
+					exit(0);
+				}
+				else if (n > 0)
+					break ;
+			}
 			if (strcmp(cmd, "exit\n"))
 			{
 				n = sprintf(cmd, "%s ; kill -10 %d\n", cmd, getpid());
@@ -220,8 +245,11 @@ int	main(int unused, char** av)
 			n = read(blue.master, cmd, DEBUG_SIZE_MAX);
 			cmd[n] = '\0';
 			commandline_finished = 0;
-			write(blue.client, cmd, n);
-			write(blue.client, "\001", 2);
+			m = write(blue.client, cmd, n);
+			if ((m == 0 && n > 0) || m < 0)
+				printf("DECONNECTION!!!\n");
+			if (write(blue.client, "\001", 2) <= 0)
+				printf("DECONNECTION!!!\n");
 		}
 	}
 	return (0);
