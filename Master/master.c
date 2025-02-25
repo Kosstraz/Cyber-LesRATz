@@ -71,7 +71,6 @@ int	main(int unused, char** av)
 	int		n = 0;
 	fcntl(red.ratz.server, F_SETFL, ~O_NONBLOCK);
 	recv_auth_error(red);
-	fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) | O_NONBLOCK);
 	while (red.killed == 0)
 	{
 		red.buffer = readline(RATZ_PROMPT);
@@ -93,9 +92,7 @@ int	main(int unused, char** av)
 			{
 				if (write(red.ratz.server, red.buffer, strlen(red.buffer)) <= 0)
 					strexit("send", 0);
-				fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) & ~O_NONBLOCK);
 				n = read(red.ratz.server, output, sizeof(output));
-				fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) | O_NONBLOCK);
 				write(STDOUT_FILENO, output, n);
 				free(red.buffer);
 			}
