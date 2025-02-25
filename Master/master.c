@@ -81,15 +81,24 @@ int	main(int unused, char** av)
 			write(red.ratz.server, "exit\n", 6);
 			red.killed = 1;
 		}
-		else if (red.buffer[0] && strcmp(red.buffer, "\003"))
+		else if (red.buffer[0])
 		{
-			if (write(red.ratz.server, red.buffer, strlen(red.buffer)) <= 0)
-				strexit("send", 0);
-			fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) & ~O_NONBLOCK);
-			n = read(red.ratz.server, output, sizeof(output));
-			fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) | O_NONBLOCK);
-			write(STDOUT_FILENO, output, n);
-			free(red.buffer);
+			if (!strcmp(red.buffer, "exit"))
+			{
+				printf("exit\n");
+				write(red.ratz.server, "exit\n", 6);
+				red.killed = 1;
+			}
+			else if (strcmp(red.buffer, "\003"))
+			{
+				if (write(red.ratz.server, red.buffer, strlen(red.buffer)) <= 0)
+					strexit("send", 0);
+				fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) & ~O_NONBLOCK);
+				n = read(red.ratz.server, output, sizeof(output));
+				fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) | O_NONBLOCK);
+				write(STDOUT_FILENO, output, n);
+				free(red.buffer);
+			}
 		}
 	}
 	close(red.ratz.server);
