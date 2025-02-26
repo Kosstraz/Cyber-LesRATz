@@ -250,17 +250,24 @@ int	main(int unused, char** av)
 				while (cls == 0)
 					;
 				read(blue.master, cmd, n + 1);
+				n = 0;
+				fcntl(blue.master, F_SETFL, O_NONBLOCK);
 				while (clf == 0)
-					;
+				{
+					//n = read(blue.master, cmd, DEBUG_SIZE_MAX);
+					//cmd[n] = '\0';	
+					//printf("n : %d\noutput : $%s$\n", n, cmd);
+					//if (n > 0)
+					//{
+					//	if (write(blue.client, cmd, n) <= 0)
+					//		wait_new_connection(&blue);
+					//}
+				}
 # ifdef DEBUG
 	P("cmd end\n")
 # endif
-				fcntl(blue.master, F_SETFL, O_NONBLOCK);
 				n = read(blue.master, cmd, DEBUG_SIZE_MAX);
-				fcntl(blue.master, F_SETFL, ~O_NONBLOCK);
 				cmd[n] = '\0';
-				cls = 0;
-				clf = 0;
 				if (n > 0)
 				{
 					if (write(blue.client, cmd, n) <= 0)
@@ -268,6 +275,9 @@ int	main(int unused, char** av)
 				}
 				else if (write(blue.client, "\001", 2) <= 0)
 					wait_new_connection(&blue);
+				fcntl(blue.master, F_SETFL, ~O_NONBLOCK);
+				cls = 0;
+				clf = 0;
 			}
 		}
 	}
