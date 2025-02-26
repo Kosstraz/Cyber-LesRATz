@@ -19,6 +19,13 @@
 #ifndef SLAVE_H
 #define SLAVE_H
 
+# define DEBUG
+
+# ifdef DEBUG
+#  include <stdarg.h>
+#  define P(...) printf(__VA_ARGS__);
+# endif
+
 # include <sys/socket.h>
 # include <arpa/inet.h>
 # include <netdb.h>
@@ -46,6 +53,7 @@ typedef struct auth
 
 typedef struct blue
 {
+	int		pid;
 	int		master;		// ptm fd
 	int		slave;		// pts fd
 	int		client;		// client fd (i/o)

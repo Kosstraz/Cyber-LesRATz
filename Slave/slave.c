@@ -19,7 +19,8 @@
 # include "ratz.h"
 # include "slave.h"
 
-static int	commandline_finished = 0;
+static int	cls = 0;
+static int	clf = 0;
 
 char*	get_own_addr(void)
 {
@@ -123,10 +124,12 @@ char*	strjoin(char* a, char* b)
 	return (new);
 }
 
-void	sigusr1_handling(int sig)
+void	sigh(int sig)
 {
 	if (sig == SIGUSR1)
-		commandline_finished = 1;	
+		clf = 1;
+	else if (sig == SIGUSR2)
+		cls = 1;
 }
 
 void	init_auth(s_auth* auth)
@@ -174,6 +177,9 @@ void	send_auth_error(s_blue blue)
 
 void	wait_new_connection(s_blue* blue)
 {
+# ifdef DEBUG
+	P("wait new connection\n")
+# endif
 	close(blue->client);
 	wait_connection(blue);
 	send_auth_error(*blue);
@@ -193,6 +199,7 @@ int	main(int unused, char** av)
 	init_server(&blue);
 	create_ptm(&blue);
 
+	blue.pid = getpid();
 	blue.chd = fork();
 	if (blue.chd == -1)
 		strexit("fork", 1);
@@ -209,12 +216,13 @@ int	main(int unused, char** av)
 	}
 	else
 	{
-		signal(SIGUSR1, sigusr1_handling);
+		signal(SIGUSR1, sigh);
+		signal(SIGUSR2, sigh);
 		close(blue.slave);
 
 		char	cmd[DEBUG_SIZE_MAX] = {0};	// 3 var for DEBUGGING
+		char*	tmp;
 		int		n = 0;
-		int		m = 0;
 
 		fcntl(blue.client, F_SETFL, ~O_NONBLOCK);
 		fcntl(blue.master, F_SETFL, ~O_NONBLOCK);
@@ -222,22 +230,43 @@ int	main(int unused, char** av)
 		while (waitpid(blue.chd, NULL, WNOHANG) == 0)
 		{
 			memset(cmd, 0, DEBUG_SIZE_MAX);
+# ifdef DEBUG
+	P("waiting...\n")
+# endif
 			n = read(blue.client, cmd, DEBUG_SIZE_MAX);
 			if (n <= 0 || !strcmp(cmd, "exit\n"))
 				wait_new_connection(&blue);
 			else
 			{
-				n = sprintf(cmd, "%s ; kill -10 %d\n", cmd, getpid());
+				tmp = strdup(cmd);
+				n = sprintf(cmd, "kill -12 %d ; %s ; kill -10 %d\n", blue.pid, tmp, blue.pid);
 				cmd[n] = 0;
-				m = write(blue.master, cmd, n);
-				while (commandline_finished == 0)
+				//printf("cmd : %s\n", cmd);
+				
+				n = write(blue.master, cmd, n);
+# ifdef DEBUG
+	P("cmd start\n")
+# endif
+				while (cls == 0)
 					;
+				read(blue.master, cmd, n + 1);
+				while (clf == 0)
+					;
+# ifdef DEBUG
+	P("cmd end\n")
+# endif
+				fcntl(blue.master, F_SETFL, O_NONBLOCK);
 				n = read(blue.master, cmd, DEBUG_SIZE_MAX);
+				fcntl(blue.master, F_SETFL, ~O_NONBLOCK);
 				cmd[n] = '\0';
-				commandline_finished = 0;
-				if (n - (m + 1) > 0)
-					m = write(blue.client, &cmd[m + 1], n);
-				if (write(blue.client, "\001", 2) <= 0)
+				cls = 0;
+				clf = 0;
+				if (n > 0)
+				{
+					if (write(blue.client, cmd, n) <= 0)
+						wait_new_connection(&blue);
+				}
+				else if (write(blue.client, "\001", 2) <= 0)
 					wait_new_connection(&blue);
 			}
 		}

