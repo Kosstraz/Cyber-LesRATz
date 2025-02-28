@@ -109,7 +109,7 @@ int	main(int unused, char** av)
 					//poll(&pfd, 1, 100);
 					//printf("q\n");
 					fcntl(red.ratz.server, F_SETFL, O_NONBLOCK);
-					n = read(red.ratz.server, output, sizeof(output));
+					n = recv(red.ratz.server, output, sizeof(output), 0);
 					if (n > 0)
 					{
 						if (strstr(output, "\0033EONING\003"))
@@ -134,7 +134,7 @@ int	main(int unused, char** av)
 					//printf("n : %d\n", n);
 					fcntl(red.ratz.server, F_SETFL, ~O_NONBLOCK);
 					if (n > 0)
-						write(red.ratz.server, output, n - 1);
+						send(red.ratz.server, output, n - 1, 0);
 				}
 				printf("sortie\n");
 				fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) & ~O_NONBLOCK);

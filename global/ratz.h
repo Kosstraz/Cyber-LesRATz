@@ -53,7 +53,8 @@ typedef struct ratz
 {
 	char*			addr;		// IP address
 	int				raw_port;	// raw port (int BigEndian)
-	int				server;		// server fd
+	int				server;		// server fd (output)
+	int				server_in;	// server fd (input)
 	s_sockaddr_in	addri;		// socket address info
 	socklen_t		addri_len;	// socket address' len
 	s_polling		poll;

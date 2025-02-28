@@ -16,53 +16,37 @@
 /*               `----'              `---'      `--`---'                               */
 /***************************************************************************************/
 
-#ifndef SLAVE_H
-#define SLAVE_H
+#ifndef PROXY_H
+#define PROXY_H
 
-//# define DEBUG
-
-# ifdef DEBUG
-#  include <stdarg.h>
-#  define P(...) printf(__VA_ARGS__);
-# endif
+# include <unistd.h>
+# include <stdlib.h>
+# include <string.h>
+# include <stdio.h>
+# include <fcntl.h>
 
 # include <sys/socket.h>
 # include <arpa/inet.h>
 # include <netdb.h>
+# include <sys/select.h>
 
-# include <poll.h>
-
-# include <sys/mman.h>
-//# include <termios.h>
-
-//# include <time.h>
-# include <sys/ioctl.h>
-# include <fcntl.h>
-# include <unistd.h>
-# include <string.h>
-# include <stdio.h>
-# include <stdlib.h>
-# include <sys/wait.h>
-# include <stdarg.h>
-
-typedef struct auth
+typedef struct polling
 {
-	int	pr;
-	int	gr;
-	int	ioctl;
-	int	setsid;
-}	s_auth;
+	int		max_fd;
+	fd_set	wr;
+	fd_set	rd;
+}	s_polling;
 
-typedef struct blue
+typedef struct proxy
 {
-	int		pid;
-	int		master;		// ptm fd
-	int		slave;		// pts fd
-	int		client;		// client fd (output)
-	int		client_in;	// client fd (input)
-	int		chd;		// child
-	s_auth	auth;		// authorizations
-	s_ratz	ratz;		// other things
-}	s_blue;
+	s_sockaddr_in	addri;
+	socklen_t		addri_len;
+	s_polling		polling;
+	int				v_in;
+	int				v_out;
+	int				a_in;
+	int				a_out;
+	int				serv;
+}	s_proxy;
 
 #endif
