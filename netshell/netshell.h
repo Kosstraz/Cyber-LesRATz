@@ -25,6 +25,8 @@
 
 # define RATZ_PROMPT	"\e[1;32mRATBoard =>\e[0m "
 
+# define RATZ_BUILTIN_HELP	""
+
 # define RATZ_STRSTR_NONE	"none"
 # define RATZ_STRSTR_GR		"gr"
 # define RATZ_STRSTR_PR		"pr"
@@ -47,10 +49,7 @@
 # include <sys/socket.h>
 # include <arpa/inet.h>
 
-# include <sys/mman.h>
-# include <sys/stat.h>
-# include <sys/select.h>
-
+# include <sys/ioctl.h>
 # include <errno.h>
 # include <signal.h>
 # include <fcntl.h>

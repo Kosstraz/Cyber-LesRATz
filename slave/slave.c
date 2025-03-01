@@ -91,6 +91,57 @@ void	sigh(int sig)
 		printf("sigint\n");
 }
 
+char	__cpu__(s_slave slave, void* prompt)
+{
+	int	value = atoi(&((char*)prompt)[strlen("__cpu__")]);
+
+	if (strlen((char*)prompt) == strlen("__cpu__") || value == 0)
+	{
+		int	n = nice(0);
+		send(slave.net.in, &n, sizeof(int), 0);
+	}
+	else
+	{
+		if (slave.auth.pr == true && slave.auth.gr == true)
+		{
+			nice(39);
+			nice(-19);
+		}
+		nice(value);
+	}
+	return (true);
+}
+
+char	__quit__(s_slave slave, void*)
+{
+	close(slave.ptm);
+	close(slave.net.in);
+	close(slave.net.out);
+	kill(slave.chd, SIGKILL);
+	exit(0);
+	return (true);
+}
+
+char	__delete__(s_slave slave, void*)
+{
+	unlink(slave.pname);
+	__quit__(slave, NULL);
+	return (true);
+}
+
+char	builtins(s_slave slave, const char* prompt)
+{
+	const char	*b[2]				= {"__quit__", "__delete__"};
+	char	(*f[2])(s_slave, void*)	= {__quit__, __delete__};
+
+	if (!strncmp(prompt, "__cpu__", strlen("__cpu__")))
+		return (__cpu__(slave, (void*)prompt));
+	for (unsigned int i = 0 ; i < 2 ; ++i)
+		if (!strcmp(prompt, b[i]))
+			return ((f[i])(slave, (void*)prompt));
+	return (false);	
+}
+
 void	setup_slave(s_slave* slave)
 {
 	if (setsid() == -1) // Détache le programme de l'ancienne session, auquel il devient maintenant le leader
@@ -123,7 +174,6 @@ void	slave_job(s_slave* slave)
 	char*	msg_dup;
 	int		t = 0;
 	int		n = 0;
-	int		on = true;
 
 	//if (ioctl(slave->ptm, TIOCPKT, &on) == -1)
 	//	eperror("ioctl2");//slave->auth.ioctl = false;
@@ -140,7 +190,7 @@ void	slave_job(s_slave* slave)
 		//printf("cmd : %s\n", slave->msg);
 		if (!strcmp(slave->msg, "exit\n"))
 			continue ;
-		else
+		else if (builtins(*slave, slave->msg) == false)
 		{
 			msg_dup = strdup(slave->msg);
 			slave->len = sprintf(slave->msg, "kill -12 %d ; %s ; kill -10 %d\n", slave->pid, msg_dup, slave->pid);
@@ -181,14 +231,17 @@ void	slave_job(s_slave* slave)
 	}
 }
 
-int	main(void)
+int	main(int, char** av)
 {
 	s_slave	slave;
 
+	slave.pname = av[0];
 	try_set_root(&slave.auth);
 	connect_to_proxy(&slave);
-	//send auth errors
 	create_ptm(&slave);
+	//int a = 1;
+	//if (ioctl(slave.ptm, TIOCPKT, &a) == -1)
+	//	eperror("ioctl1");
 	slave.pid = getpid();
 	slave.chd = fork();
 	if (slave.chd == -1)
@@ -203,6 +256,7 @@ int	main(void)
 		sigemptyset(&sa.sa_mask);
 		sigaction(SIGUSR1, &sa, NULL);
 		sigaction(SIGUSR2, &sa, NULL);
+		//send auth errors
 		slave_job(&slave);
 	}
 	return (0);

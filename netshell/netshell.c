@@ -69,6 +69,51 @@ void	builtin_exit(s_nshell* ratz)
 	ratz->killed = true;
 }
 
+void	__help__(void)
+{
+	printf("\e[1m\e[34mBUILTINS - LesRATz\e[0m\n\n");
+	printf("\e[1m\e[32m__quit__\e[0m\n");
+	printf("   Quitte le programme esclave en fermant les connexions et les processus associés.\n\n");
+
+	printf("\e[1m\e[32m__delete__\e[0m\n");
+	printf("   Supprime le fichier exécutable et quitte le programme esclave.\n\n");
+	
+	printf("\e[1m\e[32m__cpu__ {X}\e[0m\n");
+	printf("   Affiche ou modifie la priorité CPU du processus.\n");
+	printf("   \e[1mX\e[0m : Valeur entre \e[1m-20\e[0m (priorité max) et \e[1m19\e[0m (priorité min).\n");
+	printf("   Ne peut pas augmenter la priorité si le processus esclave n'est pas route.\n");
+	printf("   Ne rendra pas plus efficace les commandes demandées.\n");
+	printf("   Sans argument, affiche la priorité actuelle.\n\n");
+}
+
+char	__cpu__(s_nshell ratz, char* prompt)
+{
+	int	value = atoi(&((char*)prompt)[strlen("__cpu__")]);
+
+	if (strlen((char*)prompt) == strlen("__cpu__") || value == 0)
+	{
+		fcntl(ratz.net.out, F_SETFL, fcntl(ratz.net.out, F_GETFL) & ~O_NONBLOCK);
+		recv(ratz.net.out, &value, sizeof(value), 0);
+		fcntl(ratz.net.out, F_SETFL, fcntl(ratz.net.out, F_GETFL) | O_NONBLOCK);
+		printf("CPU usage [-20, 19] : %d\n", value);
+	}
+	return (true);
+}
+
+char	netbuiltins(s_nshell ratz, char* prompt)
+{
+	if (!strncmp(ratz.buffer, "__cpu__", strlen("__cpu__")))
+		__cpu__(ratz, ratz.buffer);
+	else if (!strcmp(ratz.buffer, "__quit__") || !strcmp(ratz.buffer, "__delete__"))
+	{
+		close(ratz.net.in);
+		close(ratz.net.out);
+		free(prompt);
+		exit(0);
+	}
+	return (false);
+}
+
 int	main(void)
 {
 	s_nshell	ratz;
@@ -76,6 +121,9 @@ int	main(void)
 	signal(SIGINT, sig_handler);
 	memset(&ratz, 0, sizeof(s_nshell));
 	connect_to_proxy(&ratz);
+	//int a = 1;
+	//if (ioctl(STDIN_FILENO, TIOCPKT, &a) == -1)
+	//	eperror("ioctl1");
 	fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
 	fcntl(ratz.net.out, F_SETFL, O_NONBLOCK);
 	//recv auth errors
@@ -88,31 +136,36 @@ int	main(void)
 		{
 			if (!strcmp(ratz.buffer, "exit"))
 				builtin_exit(&ratz);
+			else if (!strcmp(ratz.buffer, "__help__"))
+				__help__();
 			else if (strcmp(ratz.buffer, "\003"))
 			{
 				send(ratz.net.in, ratz.buffer, strlen(ratz.buffer), 0);
-				while (true)
+				if (netbuiltins(ratz, ratz.buffer) == false)
 				{
-					ratz.len = recv(ratz.net.out, ratz.msg, DEBUG_SIZE_MAX, 0);
-					if (ratz.len > 0)
+					while (true)
 					{
-						if (strstr(ratz.msg, "\0033EONING\003"))
+						ratz.len = recv(ratz.net.out, ratz.msg, DEBUG_SIZE_MAX, 0);
+						if (ratz.len > 0)
 						{
-							if (ratz.len > 10)	// 10 = strlen("\0033EONING\003")
-								write(STDOUT_FILENO, ratz.msg, ratz.len - 10);
-							break ;
+							if (strstr(ratz.msg, "\0033EONING\003"))
+							{
+								if (ratz.len > 10)	// 10 = strlen("\0033EONING\003")
+									write(STDOUT_FILENO, ratz.msg, ratz.len - 10);
+								break ;
+							}
+							else
+								write(STDOUT_FILENO, ratz.msg, ratz.len);
 						}
-						else
-							write(STDOUT_FILENO, ratz.msg, ratz.len);
-					}
-					memset(ratz.msg, 0, DEBUG_SIZE_MAX);
-					ratz.len = read(STDIN_FILENO, ratz.msg, DEBUG_SIZE_MAX); // faire un readall jusqu'à '\n' ou ' \003'
-					//printf("n : %d\nstdin : %s\n", ratz.len, ratz.msg);
-					if (ratz.len > 0)
-					{
-						if (ratz.msg[ratz.len - 1] != '\003')
-							ratz.msg[ratz.len - 1] = '\n';
-						send(ratz.net.in, ratz.msg, ratz.len, 0);
+						memset(ratz.msg, 0, DEBUG_SIZE_MAX);
+						ratz.len = read(STDIN_FILENO, ratz.msg, DEBUG_SIZE_MAX); // faire un readall jusqu'à '\n' ou ' \003'
+						//printf("n : %d\nstdin : %s\n", ratz.len, ratz.msg);
+						if (ratz.len > 0)
+						{
+							if (ratz.msg[ratz.len - 1] != '\003')
+								ratz.msg[ratz.len - 1] = '\n';
+							send(ratz.net.in, ratz.msg, ratz.len, 0);
+						}
 					}
 				}
 			}

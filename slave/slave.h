@@ -41,9 +41,6 @@
 # include <arpa/inet.h>
 # include <netdb.h>
 
-//# include <termios.h>
-
-//# include <time.h>
 # include <sys/ioctl.h>
 # include <fcntl.h>
 # include <unistd.h>
@@ -51,7 +48,6 @@
 # include <stdio.h>
 # include <stdlib.h>
 # include <sys/wait.h>
-# include <stdarg.h>
 
 # include <signal.h>
 
@@ -76,6 +72,7 @@ typedef struct auth
 
 typedef struct slave
 {
+	char*	pname;
 	int		pid;	// own pid
 	int		chd;	// child pid
 	int		ptm;	// pt master
