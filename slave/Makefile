@@ -36,14 +36,13 @@ YELLOW 	= \e[38;2;250;189;0m
 #*   VARIABLES   *#
 # ############### #
 
-NAME = master
+NAME = slave
 
 CC = @cc
 
 LMAKE = @make --no-print-directory -C
 
-SRCS =	./../global/ratz.c \
-		./master.c
+SRCS =	./slave.c
 
 OBJS_DIR = .objs
 
@@ -53,7 +52,7 @@ DEPS = $(OBJS:%.obj=%.d)
 
 CFLAGS = -Wall -Wextra -Wno-unused-result -Wno-format -MMD -g3
 
-LIB = -lreadline -lc
+LIB = -lc
 
 INCLUDES = -I. -I../global/
 

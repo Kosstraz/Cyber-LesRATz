@@ -16,44 +16,51 @@
 /*               `----'              `---'      `--`---'                               */
 /***************************************************************************************/
 
-#ifndef RATZ_H
-#define RATZ_H
+#ifndef PROXY_H
+#define PROXY_H
 
-// Faire en sorte que lorsque l'attaquant se deconnecte, il puisse se reconnecter sans avoir a redemarrer l'hote (la victime)
-
-# define LOCALHOST	"127.0.0.1"
-# define PORT		8080
-
-# define _DEFAULT_SOURCE
+# define PORT		8081
 # define DEBUG_SIZE_MAX	1024
 
-# define _XOPEN_SOURCE	9999
-
-# include <netinet/in.h>
-# include <arpa/inet.h>
+# define bool	char
+# define true	1
+# define false	0
 
 # include <unistd.h>
 # include <stdlib.h>
-# include <errno.h>
 # include <string.h>
-//# include <stdarg.h>
+# include <stdio.h>
+# include <fcntl.h>
+
+# include <errno.h>
+
+# include <sys/socket.h>
+# include <arpa/inet.h>
+# include <netdb.h>
+# include <sys/select.h>
 
 typedef struct sockaddr_in	s_sockaddr_in;
 typedef struct sockaddr		s_sockaddr;
 
-typedef struct ratz
+typedef struct polling
 {
-	char*			addr;		// IP address
-	int				raw_port;	// raw port (int BigEndian)
-	int				server;		// server fd
-	s_sockaddr_in	addri;		// socket address info
-	socklen_t		addri_len;	// socket address' len
-}	s_ratz;
+	int		max_fd;
+	fd_set	wr;
+	fd_set	rd;
+	fd_set	err;
+}	s_polling;
 
-void	strexit(const char* msg, int errcode);
-void	ratz_set_addri(s_sockaddr_in* addri, sa_family_t af, char* ip, in_port_t raw_port);
-int		ratz_write(fd_set* set, int fd, const void* buf, int nbytes);
-int		ratz_read(fd_set* set, int fd, void* buf, int nbytes);
-int		ratz__get_port_method(char* port);
+typedef struct proxy
+{
+	s_sockaddr_in	addri;
+	socklen_t		addri_len;
+	s_polling		polling;
+	int				v_in;
+	int				v_out;
+	int				a_in;
+	int				a_out;
+	int				serv;
+	bool			dis;
+}	s_proxy;
 
 #endif

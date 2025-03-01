@@ -36,14 +36,13 @@ YELLOW 	= \e[38;2;250;189;0m
 #*   VARIABLES   *#
 # ############### #
 
-NAME = slave
+NAME = proxy
 
 CC = @cc
 
 LMAKE = @make --no-print-directory -C
 
-SRCS =	./../global/ratz.c \
-		./slave.c
+SRCS =	./proxy.c
 
 OBJS_DIR = .objs
 
@@ -51,7 +50,7 @@ OBJS = $(SRCS:%.c=$(OBJS_DIR)/%.obj)
 
 DEPS = $(OBJS:%.obj=%.d)
 
-CFLAGS = -Wall -Wextra -Wno-unused-result -Wno-format -MMD -g3
+CFLAGS = -Wall -Wextra -Wno-unused-result -Wno-format -MMD -g3 -fPIE
 
 LIB = -lc
 
