@@ -71,7 +71,7 @@ void	builtin_exit(s_nshell* ratz)
 
 void	__help__(void)
 {
-	printf("\e[1m\e[34mBUILTINS - LesRATz\e[0m\n\n");
+	printf("\e[1m\e[34mHELP INFOs - LesRATz\e[0m\n\n");
 	printf("\e[1m\e[32m__quit__\e[0m\n");
 	printf("   Quitte le programme esclave en fermant les connexions et les processus associés.\n\n");
 
@@ -84,6 +84,9 @@ void	__help__(void)
 	printf("   Ne peut pas augmenter la priorité si le processus esclave n'est pas route.\n");
 	printf("   Ne rendra pas plus efficace les commandes demandées.\n");
 	printf("   Sans argument, affiche la priorité actuelle.\n\n");
+
+	printf("\e[1m\e[32mexit \e[0m\e[32mor\e[1m ^-D\e[0m\n");
+	printf("   NE termine pas le processus esclave, mais termine uniquement le processus controleur (celui-ci).\n");
 }
 
 char	__cpu__(s_nshell ratz, char* prompt)
@@ -118,7 +121,12 @@ int	main(void)
 {
 	s_nshell	ratz;
 
-	signal(SIGINT, sig_handler);
+	//signal(SIGINT, sig_handler);
+	struct sigaction	sa;
+	sa.sa_flags = 0;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_handler = sig_handler;
+	sigaction(SIGINT, &sa, NULL);
 	memset(&ratz, 0, sizeof(s_nshell));
 	connect_to_proxy(&ratz);
 	//int a = 1;

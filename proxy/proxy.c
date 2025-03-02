@@ -45,7 +45,7 @@ char*	get_own_addr(void)
 	return (ipv4);
 }
 
-char	determine_connection(s_proxy* proxy)
+void	determine_connection(s_proxy* proxy)
 {
 	char	req_pass[3] = {0};
 	int		tmp = -1;
@@ -85,7 +85,6 @@ char	determine_connection(s_proxy* proxy)
 			printf("Client A connected his %s\n", (req_pass[1] == 'i' ? "input" : "output"));
 		}
 	}
-	return (req_pass[0]);
 }
 
 int	__max(int a, int b, int c, int d)
