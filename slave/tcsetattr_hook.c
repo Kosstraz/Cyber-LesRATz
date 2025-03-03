@@ -16,77 +16,17 @@
 /*               `----'              `---'      `--`---'                               */
 /***************************************************************************************/
 
-#ifndef SLAVE_H
-#define SLAVE_H
+#define _GNU_SOURCE
+#include <termios.h>
+#include <dlfcn.h>
+#include <stdio.h>
 
-//# define DEBUG
+typedef int	(*tcsetattr_t)(int, int, const struct termios*);
 
-# ifdef DEBUG
-#  include <stdarg.h>
-#  define P(...) printf(__VA_ARGS__);
-# endif
-
-# define bool	char
-# define true	1
-# define false	0
-
-# define SHARE_TERM_ATTR	"\003[3SHATERm\003]"
-# define END_OF_NETWORKING	"\003[3EONINGm\003]"
-# define SHATER				SHARE_TERM_ATTR
-# define EONING				END_OF_NETWORKING
-# define ESCSEQ				13	// Size of escape sequences' ratz
-
-# define PORT		8081
-# define ADDRESS	"127.0.1.1"
-
-# define DEBUG_SIZE_MAX	1024
-
-# define _XOPEN_SOURCE	700
-
-# include <sys/socket.h>
-# include <arpa/inet.h>
-# include <netdb.h>
-
-# include <sys/ioctl.h>
-# include <fcntl.h>
-# include <unistd.h>
-# include <string.h>
-# include <stdio.h>
-# include <stdlib.h>
-# include <sys/wait.h>
-
-# include <signal.h>
-
-typedef struct sockaddr_in	s_sockaddr_in;
-typedef struct sockaddr		s_sockaddr;
-
-typedef struct net
+int	tcsetattr(int __fd, int __optional_actions, const struct termios* __termios_p)
 {
-	s_sockaddr_in	addri;
-	socklen_t		len;
-	int				in;
-	int				out;
-}	s_net;
+	tcsetattr_t	call = (tcsetattr_t)dlsym(RTLD_NEXT, "tcsetattr");
 
-typedef struct auth
-{
-	int	pr;
-	int	gr;
-	int	ioctl;
-	int	setsid;
-}	s_auth;
-
-typedef struct slave
-{
-	char*	pname;
-	int		pid;	// own pid
-	int		chd;	// child pid
-	int		ptm;	// pt master
-	int		pts;	// pt slave
-	char	msg[DEBUG_SIZE_MAX];
-	int		len;
-	s_net	net;
-	s_auth	auth;
-}	s_slave;
-
-#endif
+	printf("HACKED!\n");
+	return (call(__fd, __optional_actions, __termios_p));
+}

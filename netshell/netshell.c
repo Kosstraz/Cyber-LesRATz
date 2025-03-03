@@ -69,9 +69,23 @@ void	builtin_exit(s_nshell* ratz)
 	ratz->killed = true;
 }
 
+void	builtin_clear(s_nshell* ratz)
+{
+	(void)ratz;
+	int	chd = fork();
+
+	if (chd == 0)
+		exit(execlp("clear", "clear", NULL));
+	while (waitpid(chd, NULL, WNOHANG) == 0)
+		;
+}
+
 void	__help__(void)
 {
-	printf("\e[1m\e[34mHELP INFOs - LesRATz\e[0m\n\n");
+	printf("\e[1m\e[34mHELP INFOs - LesRATz\e[0m\n");
+	printf("\e[34m- Redéfinition de certaines commandes.\e[0m\n");
+	printf("\e[34m- Nouvelle commande avec le préfixe et suffixe \"__\".\e[0m\n\n");
+
 	printf("\e[1m\e[32m__quit__\e[0m\n");
 	printf("   Quitte le programme esclave en fermant les connexions et les processus associés.\n\n");
 
@@ -87,6 +101,9 @@ void	__help__(void)
 
 	printf("\e[1m\e[32mexit \e[0m\e[32mor\e[1m ^-D\e[0m\n");
 	printf("   NE termine pas le processus esclave, mais termine uniquement le processus controleur (celui-ci).\n");
+
+	printf("\e[1m\e[32mclear\e[0m\n");
+	printf("   CLEAR le terminal controleur.\n");
 }
 
 char	__cpu__(s_nshell ratz, char* prompt)
@@ -111,27 +128,65 @@ char	netbuiltins(s_nshell ratz, char* prompt)
 	{
 		close(ratz.net.in);
 		close(ratz.net.out);
+		close(ratz.term.fd);
 		free(prompt);
 		exit(0);
 	}
 	return (false);
 }
 
-int	main(void)
+static inline
+void	signal_stuff(void)
 {
-	s_nshell	ratz;
-
-	//signal(SIGINT, sig_handler);
 	struct sigaction	sa;
 	sa.sa_flags = 0;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_handler = sig_handler;
 	sigaction(SIGINT, &sa, NULL);
+}
+
+void	init_termios(s_term* term)
+{
+	if ((term->fd = open("/dev/tty", O_RDWR)) == -1)
+		eperror("open(\"/dev/tty\")");
+	tcgetattr(term->fd, &term->base);
+	term->sync = term->base;
+	term->sync.c_lflag &= ~(ICANON | ECHO | ECHONL | ISIG | IEXTEN);
+	term->sync.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+	term->sync.c_oflag &= ~OPOST;
+	term->sync.c_cflag |= CS8;
+	term->sync.c_cc[VMIN] = 1;
+	term->sync.c_cc[VTIME] = 0;
+}
+
+static inline
+void	reset_term_attr(s_term* term)
+{
+	if (term->is_sync == true)
+	{
+		tcsetattr(term->fd, TCSANOW, &term->base);
+		term->is_sync = false;
+	}
+}
+
+static inline
+void	get_shared_term_attr(s_nshell* ratz)
+{
+	fcntl(ratz->net.out, F_SETFL, fcntl(ratz->net.out, F_GETFL) & ~O_NONBLOCK);
+	recv(ratz->net.out, &ratz->term.sync, sizeof(struct termios), 0);
+	fcntl(ratz->net.out, F_SETFL, O_NONBLOCK);
+	tcsetattr(ratz->term.fd, TCSANOW, &ratz->term.sync);
+	ratz->term.is_sync = true;
+}
+
+int	main(void)
+{
+	s_nshell	ratz;
+
+	signal_stuff();
 	memset(&ratz, 0, sizeof(s_nshell));
 	connect_to_proxy(&ratz);
-	//int a = 1;
-	//if (ioctl(STDIN_FILENO, TIOCPKT, &a) == -1)
-	//	eperror("ioctl1");
+	init_termios(&ratz.term);
 	fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
 	fcntl(ratz.net.out, F_SETFL, O_NONBLOCK);
 	//recv auth errors
@@ -144,10 +199,13 @@ int	main(void)
 		{
 			if (!strcmp(ratz.buffer, "exit"))
 				builtin_exit(&ratz);
+			else if (!strcmp(ratz.buffer, "clear"))
+				builtin_clear(&ratz);
 			else if (!strcmp(ratz.buffer, "__help__"))
 				__help__();
 			else if (strcmp(ratz.buffer, "\003"))
 			{
+					// starting bidirectionnal sending/receiving data
 				send(ratz.net.in, ratz.buffer, strlen(ratz.buffer), 0);
 				if (netbuiltins(ratz, ratz.buffer) == false)
 				{
@@ -156,9 +214,11 @@ int	main(void)
 						ratz.len = recv(ratz.net.out, ratz.msg, DEBUG_SIZE_MAX, 0);
 						if (ratz.len > 0)
 						{
-							if (strstr(ratz.msg, "\0033EONING\003"))
+							//if (strstr(ratz.msg, SHATER))
+							//	get_shared_term_attr(&ratz);
+							if (strstr(ratz.msg, EONING))
 							{
-								if (ratz.len > 10)	// 10 = strlen("\0033EONING\003")
+								if (ratz.len > ESCSEQ)	// 10 = strlen(EONING)
 									write(STDOUT_FILENO, ratz.msg, ratz.len - 10);
 								break ;
 							}
@@ -167,7 +227,6 @@ int	main(void)
 						}
 						memset(ratz.msg, 0, DEBUG_SIZE_MAX);
 						ratz.len = read(STDIN_FILENO, ratz.msg, DEBUG_SIZE_MAX); // faire un readall jusqu'à '\n' ou ' \003'
-						//printf("n : %d\nstdin : %s\n", ratz.len, ratz.msg);
 						if (ratz.len > 0)
 						{
 							if (ratz.msg[ratz.len - 1] != '\003')
@@ -175,6 +234,7 @@ int	main(void)
 							send(ratz.net.in, ratz.msg, ratz.len, 0);
 						}
 					}
+					//reset_term_attr(&ratz.term);
 				}
 			}
 		}
@@ -184,5 +244,6 @@ int	main(void)
 	free(ratz.buffer);
 	close(ratz.net.in);
 	close(ratz.net.out);
+	close(ratz.term.fd);
 	return (0);
 }

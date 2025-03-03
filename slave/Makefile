@@ -52,7 +52,7 @@ DEPS = $(OBJS:%.obj=%.d)
 
 CFLAGS = -Wall -Wextra -Wno-unused-result -Wno-format -MMD -g3
 
-LIB = -lc
+LIB = -ldl -lc
 
 INCLUDES = -I. -I../global/
 

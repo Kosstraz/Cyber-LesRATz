@@ -39,11 +39,18 @@
 # define RATZ_SETSID_ER		"\e[31mRazmo : \e[0mCan not detach, and be the session leader.\n"
 # define RATZ_IOCTL_ER		"\e[31mRazmo : \e[0mCan not take control of his process.\n"
 
+# define SHARE_TERM_ATTR	"\003[3SHATERm\003]"
+# define END_OF_NETWORKING	"\003[3EONINGm\003]"
+# define SHATER				SHARE_TERM_ATTR
+# define EONING				END_OF_NETWORKING
+# define ESCSEQ				13	// Size of escape sequences' ratz
+
 # define PORT		8081
 # define ADDRESS	"127.0.1.1"
 
 # define DEBUG_SIZE_MAX	1024
 
+# define _DEFAULT_SOURCE
 # define _XOPEN_SOURCE	700
 
 # include <sys/socket.h>
@@ -57,6 +64,9 @@
 # include <unistd.h>
 # include <stdio.h>
 # include <stdlib.h>
+# include <sys/wait.h>
+
+# include <termios.h>
 
 # include <readline/readline.h>
 # include <readline/history.h>
@@ -72,6 +82,14 @@ typedef struct net
 	int				out;
 }	s_net;
 
+typedef struct term
+{
+	struct termios	base;
+	struct termios	sync;
+	bool			is_sync;
+	int				fd;
+}	s_term;
+
 typedef struct nshell
 {
 	char*	buffer;
@@ -79,6 +97,7 @@ typedef struct nshell
 	int		len;
 	bool	killed;
 	s_net	net;
+	s_term	term;
 }	s_nshell;
 
 #endif

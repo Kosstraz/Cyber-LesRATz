@@ -163,7 +163,8 @@ void	fork_job(s_slave* slave)
 	close(slave->net.in);
 	close(slave->net.out);
 	setenv("PS1", "", 1);
-	setenv("TERM", "dumb", 1);
+	setenv("LD_PRELOAD", "./hooked_tcsetattr.so", 1);
+	//setenv("TERM", "dumb", 1);
 	if (execlp("bash", "bash", "--posix", "--norc", "--noprofile", NULL) == -1)
 		eperror("execlp");
 }
@@ -175,8 +176,6 @@ void	slave_job(s_slave* slave)
 	int		t = 0;
 	int		n = 0;
 
-	//if (ioctl(slave->ptm, TIOCPKT, &on) == -1)
-	//	eperror("ioctl2");//slave->auth.ioctl = false;
 	fcntl(slave->ptm, F_SETFL, fcntl(slave->ptm, F_GETFL) & ~O_NONBLOCK);
 	fcntl(slave->net.in, F_SETFL, fcntl(slave->net.in, F_GETFL) & ~O_NONBLOCK);
 	fcntl(slave->net.out, F_SETFL, O_NONBLOCK);
@@ -184,7 +183,7 @@ void	slave_job(s_slave* slave)
 	{
 		memset(slave->msg, 0, DEBUG_SIZE_MAX);
 		fcntl(slave->net.out, F_SETFL, fcntl(slave->net.out, F_GETFL) & ~O_NONBLOCK);
-		while ((slave->len = recv(slave->net.out, slave->msg, DEBUG_SIZE_MAX, 0)) == 0)	// rendre bloquant ? (bruit CPU)
+		while ((slave->len = recv(slave->net.out, slave->msg, DEBUG_SIZE_MAX, 0)) == 0)
 			;
 		fcntl(slave->net.out, F_SETFL, O_NONBLOCK);
 		//printf("cmd : %s\n", slave->msg);
@@ -199,11 +198,12 @@ void	slave_job(s_slave* slave)
 			write(slave->ptm, slave->msg, slave->len);
 			while (cls == false)
 				;
+			read(slave->ptm, slave->msg, n);
 			while (true)
 			{
-				if (t < n + 1)
-					t += read(slave->ptm, &slave->msg[t], (n + 1) - t);
-				else
+				//if (t < n + 1)
+				//	t += read(slave->ptm, &slave->msg[t], (n + 1) - t);
+				//else
 				{
 					fcntl(slave->ptm, F_SETFL, O_NONBLOCK);
 					slave->len = read(slave->ptm, slave->msg, DEBUG_SIZE_MAX);
@@ -218,7 +218,7 @@ void	slave_job(s_slave* slave)
 				{
 					if (write(slave->ptm, slave->msg, slave->len) <= 0) // ici ne rentre pas dans le STDIN du pts
 						exit(1);
-					//printf("stdin : %s\n", slave->msg);
+					printf("stdin : %s\n", slave->msg);
 				}
 				if (clf == true)
 					break;
@@ -226,7 +226,7 @@ void	slave_job(s_slave* slave)
 			t = 0;
 			cls = false;
 			clf = false;
-			send(slave->net.in, "\0033EONING\003", 10, 0);
+			send(slave->net.in, EONING, ESCSEQ, 0);
 		}
 	}
 }
@@ -239,9 +239,7 @@ int	main(int, char** av)
 	try_set_root(&slave.auth);
 	connect_to_proxy(&slave);
 	create_ptm(&slave);
-	//int a = 1;
-	//if (ioctl(slave.ptm, TIOCPKT, &a) == -1)
-	//	eperror("ioctl1");
+	//nice(19);
 	slave.pid = getpid();
 	slave.chd = fork();
 	if (slave.chd == -1)
