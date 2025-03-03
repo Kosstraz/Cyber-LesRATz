@@ -42,13 +42,11 @@ int	tcsetattr(int __fd, int __optional_actions, const struct termios* __termios_
 
 		// injection
 	int	__rinfd;
-	if ((__rinfd = open(getenv("__rTCSETATTR"), O_WRONLY)) != -1) // ou juste ecrire dans le STDOUT
+	if ((__rinfd = open(getenv("__rTCSETATTR"), O_WRONLY)) != -1)
 	{
 		s___r		obj;
 		strncpy(obj.code, "\003[3SHATERm\003]", 13);
 		obj.t = *__termios_p;
-		//printf("tcsetattr flags: lflag=%x, iflag=%x, oflag=%x, cflag=%x\n",
-		//	__termios_p->c_lflag, __termios_p->c_iflag, __termios_p->c_oflag, __termios_p->c_cflag);
 		if (write(__rinfd, &obj, sizeof(s___r)) <= 0)
 		{
 			printf("Can not send new term attr\n");
