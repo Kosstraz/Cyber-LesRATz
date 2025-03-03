@@ -46,7 +46,7 @@
 # define ESCSEQ				13	// Size of escape sequences' ratz
 
 # define PORT		8081
-# define ADDRESS	"127.0.1.1"
+# define ADDRESS	"10.12.2.17"
 
 # define DEBUG_SIZE_MAX	1024
 
@@ -74,6 +74,12 @@
 typedef struct sockaddr_in	s_sockaddr_in;
 typedef struct sockaddr		s_sockaddr;
 
+typedef struct __r
+{
+	char			code[13];
+	struct termios	t;
+}	s___r;
+
 typedef struct net
 {
 	s_sockaddr_in	addri;
@@ -85,8 +91,8 @@ typedef struct net
 typedef struct term
 {
 	struct termios	base;
-	struct termios	sync;
 	bool			is_sync;
+	bool			shater;
 	int				fd;
 }	s_term;
 

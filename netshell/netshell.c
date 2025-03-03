@@ -57,6 +57,7 @@ void	sig_handler(int signum)
 	{
 		rl_on_new_line();
 		rl_redisplay();
+		rl_replace_line("", 0);
 		write(STDOUT_FILENO, "\n", 1);
 		write(STDOUT_FILENO, RATZ_PROMPT, strlen(RATZ_PROMPT));
 	}
@@ -150,13 +151,6 @@ void	init_termios(s_term* term)
 	if ((term->fd = open("/dev/tty", O_RDWR)) == -1)
 		eperror("open(\"/dev/tty\")");
 	tcgetattr(term->fd, &term->base);
-	term->sync = term->base;
-	term->sync.c_lflag &= ~(ICANON | ECHO | ECHONL | ISIG | IEXTEN);
-	term->sync.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-	term->sync.c_oflag &= ~OPOST;
-	term->sync.c_cflag |= CS8;
-	term->sync.c_cc[VMIN] = 1;
-	term->sync.c_cc[VTIME] = 0;
 }
 
 static inline
@@ -165,18 +159,20 @@ void	reset_term_attr(s_term* term)
 	if (term->is_sync == true)
 	{
 		tcsetattr(term->fd, TCSANOW, &term->base);
+		term->shater = false;
 		term->is_sync = false;
 	}
 }
 
 static inline
-void	get_shared_term_attr(s_nshell* ratz)
+void	get_shared_term_attr(s_nshell* ratz, void* buffer)
 {
-	fcntl(ratz->net.out, F_SETFL, fcntl(ratz->net.out, F_GETFL) & ~O_NONBLOCK);
-	recv(ratz->net.out, &ratz->term.sync, sizeof(struct termios), 0);
-	fcntl(ratz->net.out, F_SETFL, O_NONBLOCK);
-	tcsetattr(ratz->term.fd, TCSANOW, &ratz->term.sync);
+	s___r	obj;
+
+	memmove(&obj, buffer, sizeof(s___r));
+	tcsetattr(ratz->term.fd, TCSADRAIN, &obj.t);
 	ratz->term.is_sync = true;
+	ratz->term.shater = true;
 }
 
 int	main(void)
@@ -211,30 +207,43 @@ int	main(void)
 				{
 					while (true)
 					{
+						//printf("while (true)");
 						ratz.len = recv(ratz.net.out, ratz.msg, DEBUG_SIZE_MAX, 0);
 						if (ratz.len > 0)
 						{
-							//if (strstr(ratz.msg, SHATER))
-							//	get_shared_term_attr(&ratz);
+							if ((ratz.buffer = strstr(ratz.msg, SHATER)))
+							{
+								if (ratz.len > ESCSEQ)
+								{
+									write(STDOUT_FILENO, ratz.msg, (unsigned long long)((char*)ratz.buffer - (char*)ratz.msg));
+									get_shared_term_attr(&ratz, ratz.buffer);
+									write(STDOUT_FILENO, &ratz.buffer[sizeof(s___r)], strlen(&ratz.buffer[sizeof(s___r)]));
+								}
+								else
+									get_shared_term_attr(&ratz, ratz.buffer);
+							}
 							if (strstr(ratz.msg, EONING))
 							{
-								if (ratz.len > ESCSEQ)	// 10 = strlen(EONING)
+								if (ratz.len > ESCSEQ && ratz.term.shater == false)	// 10 = strlen(EONING)
 									write(STDOUT_FILENO, ratz.msg, ratz.len - 10);
 								break ;
 							}
-							else
+							else if (ratz.term.shater == false)
 								write(STDOUT_FILENO, ratz.msg, ratz.len);
+							ratz.term.shater = false;
 						}
 						memset(ratz.msg, 0, DEBUG_SIZE_MAX);
 						ratz.len = read(STDIN_FILENO, ratz.msg, DEBUG_SIZE_MAX); // faire un readall jusqu'à '\n' ou ' \003'
 						if (ratz.len > 0)
 						{
-							if (ratz.msg[ratz.len - 1] != '\003')
-								ratz.msg[ratz.len - 1] = '\n';
+							ratz.msg[ratz.len] = 0;	
+							if (ratz.msg[ratz.len] != '\003')
+								ratz.msg[ratz.len] = '\n';
 							send(ratz.net.in, ratz.msg, ratz.len, 0);
 						}
 					}
-					//reset_term_attr(&ratz.term);
+					ratz.term.shater = false;
+					reset_term_attr(&ratz.term);
 				}
 			}
 		}

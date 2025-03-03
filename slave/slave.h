@@ -37,7 +37,7 @@
 # define ESCSEQ				13	// Size of escape sequences' ratz
 
 # define PORT		8081
-# define ADDRESS	"127.0.1.1"
+# define ADDRESS	"10.12.2.17"
 
 # define DEBUG_SIZE_MAX	1024
 
@@ -79,6 +79,7 @@ typedef struct auth
 typedef struct slave
 {
 	char*	pname;
+	char*	sname;
 	int		pid;	// own pid
 	int		chd;	// child pid
 	int		ptm;	// pt master

