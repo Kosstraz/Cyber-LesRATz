@@ -174,8 +174,7 @@ void	fork_job(s_slave* slave)
 	close(slave->net.out);
 	setenv("PS1", "", 1);
 	setenv("__rTCSETATTR", slave->sname, 1);
-	setenv("LD_PRELOAD", "./__rtcsetattr.so", 1);
-	//setenv("TERM", "dumb", 1); // compatibiliser xterm, ... (pour que ca fonctionne avec quasi tout --> supp cette ligne)
+	setenv("LD_PRELOAD", "./__rtcsetattr.so", 1); // absolute path
 	if (execlp("bash", "bash", "--posix", "--norc", "--noprofile", NULL) == -1)
 		eperror("execlp");
 }

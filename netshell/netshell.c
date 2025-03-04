@@ -117,6 +117,7 @@ char	__cpu__(s_nshell ratz, char* prompt)
 		recv(ratz.net.out, &value, sizeof(value), 0);
 		fcntl(ratz.net.out, F_SETFL, fcntl(ratz.net.out, F_GETFL) | O_NONBLOCK);
 		printf("CPU usage [-20, 19] : %d\n", value);
+		return (true);
 	}
 	return (true);
 }
@@ -124,7 +125,7 @@ char	__cpu__(s_nshell ratz, char* prompt)
 char	netbuiltins(s_nshell ratz, char* prompt)
 {
 	if (!strncmp(ratz.buffer, "__cpu__", strlen("__cpu__")))
-		__cpu__(ratz, ratz.buffer);
+		return (__cpu__(ratz, ratz.buffer));
 	else if (!strcmp(ratz.buffer, "__quit__") || !strcmp(ratz.buffer, "__delete__"))
 	{
 		close(ratz.net.in);
