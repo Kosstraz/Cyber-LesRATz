@@ -46,7 +46,7 @@
 # define ESCSEQ				13	// Size of escape sequences' ratz
 
 # define PORT		8081
-# define ADDRESS	"10.12.3.15"
+# define ADDRESS	"127.0.1.1"
 
 # define DEBUG_SIZE_MAX	1024
 

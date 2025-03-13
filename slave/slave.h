@@ -37,7 +37,7 @@
 # define ESCSEQ				13	// Size of escape sequences' ratz
 
 # define PORT		8081
-# define ADDRESS	"10.12.3.15"
+# define ADDRESS	"127.0.1.1"
 
 # define DEBUG_SIZE_MAX	1024
 
@@ -47,13 +47,16 @@
 # include <arpa/inet.h>
 # include <netdb.h>
 
-# include <sys/ioctl.h>
 # include <fcntl.h>
 # include <unistd.h>
 # include <string.h>
 # include <stdio.h>
 # include <stdlib.h>
+# include <limits.h>
+
 # include <sys/wait.h>
+# include <sys/stat.h>
+# include <sys/ioctl.h>
 
 # include <signal.h>
 

